@@ -1,21 +1,21 @@
 ![NexusLogo](docs/img/NexusIcon.png)
 
 
-NEXUS Engine
+# NEXUS Engine
 
 A Friday Night Funkin’ engine with custom features, tools, editors, and improvements.
 
-About
+# About
 
-NEXUS Engine is a modified Friday Night Funkin’ Psych Engine focused on adding new features and improving the modding experience.
+NEXUS Engine is a rewritten Version of Friday Night Funkin’ Psych Engine focused on adding new features and improving the modding experience.
 
 The project includes custom editors, redesigned interfaces, additional gameplay features, and mobile support.
 
-Warning
+# Warning
 
 This project is mainly developed by one person. Updates and features may take time, and development progress can vary.
 
-Features
+# Features
 
 NEXUS Engine Features
 
@@ -34,16 +34,16 @@ Note Skin Selector	100%
 
 More features are planned.
 
-Credits
+# Credits
 
 * NexaII-Z - NEXUS Engine Owner and Developer.
 
-Psych Engine Credits
+# Psych Engine Credits
 
 * Shadow Mario - Programmer.
 * Riveren - Artist.
 
-Psych Engine Special Thanks
+# Psych Engine Special Thanks
 
 * bbpanzu - Former Programmer.
 * Yoshubs - Former Programmer.
@@ -58,7 +58,7 @@ Psych Engine Special Thanks
 
 ⸻
 
-Development
+# Development
 
 NEXUS Engine is still in development. Features may change, get improved, or be delayed as development continues.
 

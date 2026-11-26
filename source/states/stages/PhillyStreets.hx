@@ -3,6 +3,8 @@ package states.stages;
 import openfl.filters.ShaderFilter;
 import shaders.RainShader;
 
+import flixel.addons.transition.FlxTransitionableState;
+
 import flixel.addons.display.FlxTiledSprite;
 import flixel.graphics.frames.FlxAtlasFrames;
 
@@ -47,6 +49,12 @@ class PhillyStreets extends BaseStage
 	var abot:ABotSpeaker;
 	override function create()
 	{
+		W1Util.useWeekendFolder();
+
+		//load every image first (without GPU upload) so a missing/undecodable file is reported on screen instead of leaving a silent black stage
+		var missingImages:Array<String> = W1Util.checkImages(['phillyStreets/phillySkybox','phillyStreets/phillySkyline','phillyStreets/phillyForegroundCity','phillyStreets/phillyConstruction','phillyStreets/phillyHighwayLights','phillyStreets/phillyHighwayLights_lightmap','phillyStreets/phillyHighway','phillyStreets/phillySmog','phillyStreets/phillyCars','phillyStreets/phillyTraffic','phillyStreets/phillyTraffic_lightmap','phillyStreets/phillyForeground','SpraycanPile','PicoBullet','spraypaintExplosionEZ','abot/stereoBG','abot/aBotViz']);
+		W1Util.reportMissing(missingImages);
+
 		if(!ClientPrefs.data.lowQuality)
 		{
 			var skyImage = Paths.image('phillyStreets/phillySkybox');
@@ -135,7 +143,7 @@ class PhillyStreets extends BaseStage
 		updateABotEye(true);
 		add(abot);
 		
-		if(ClientPrefs.data.shaders)
+		if(ClientPrefs.data.shaders && W1Util.USE_RAIN_SHADER)
 			setupRainShader();
 
 		var _song = PlayState.SONG;
@@ -150,9 +158,9 @@ class PhillyStreets extends BaseStage
 			switch (songName)
 			{
 				case 'darnell':
-					if(!seenCutscene) setStartCallback(videoCutscene.bind('darnellCutscene'));
+					if(!seenCutscene) setStartCallback(playDarnellVideo);
 				case '2hot':
-					setEndCallback(function()
+					if(W1Util.USE_VIDEOS) setEndCallback(function()
 					{
 						game.endingSong = true;
 						inCutscene = true;
@@ -207,39 +215,21 @@ class PhillyStreets extends BaseStage
 		}
 	}
 
-	var videoEnded:Bool = false;
-	function videoCutscene(?videoName:String = null)
+	function playDarnellVideo()
 	{
 		game.inCutscene = true;
-		if(!videoEnded && videoName != null)
+		if(!W1Util.USE_VIDEOS)
 		{
-			#if VIDEOS_ALLOWED
-			game.startVideo(videoName);
-			game.videoCutscene.finishCallback = game.videoCutscene.onSkip = function()
-			{
-				videoEnded = true;
-				game.videoCutscene = null;
-				videoCutscene();
-			};
-
-			#else //Make a timer to prevent it from crashing due to sprites not being ready yet.
-			new FlxTimer().start(0.0, function(tmr:FlxTimer)
-			{
-				videoEnded = true;
-				videoCutscene(videoName);
-			});
-			#end
+			darnellCutscene(); //skip the .mp4 and run the in-engine cutscene directly
 			return;
 		}
-		
-		if (isStoryMode)
-		{
-			switch (songName)
-			{
-				case 'darnell':
-					darnellCutscene();
-			}
-		}
+		#if VIDEOS_ALLOWED
+		// plays the video, then runs the in-engine cutscene instead of starting the countdown
+		game.startVideo('darnellCutscene', darnellCutscene);
+		#else
+		// no video support: go straight to the in-engine part (timer so the sprites are ready)
+		new FlxTimer().start(0.0, function(_) darnellCutscene());
+		#end
 	}
 
 	var cutsceneHandler:CutsceneHandler;
@@ -367,23 +357,6 @@ class PhillyStreets extends BaseStage
 			spraycan.visible = spraycan.active = spraycan.cutscene = false;
 			camHUD.alpha = 1;
 			startCountdown();
-		};
-		cutsceneHandler.skipCallback = function()
-		{
-			cutsceneHandler.finishCallback();
-
-			dad.dance();
-			gf.dance();
-			boyfriend.dance();
-			dad.animation.finishCallback = null;
-			gf.animation.finishCallback = null;
-			
-			game.moveCameraSection();
-			game.cameraSpeed = 1;
-			FlxTween.cancelTweensOf(FlxG.camera);
-			FlxTween.cancelTweensOf(FlxG.camera.scroll);
-			FlxG.camera.scroll.set(camFollow.x - FlxG.width/2, camFollow.y - FlxG.height/2);
-			FlxG.camera.zoom = defaultCamZoom;
 		};
 		FlxG.camera.fade(FlxColor.BLACK, 2, true, null, true);
 	}
@@ -603,7 +576,9 @@ class PhillyStreets extends BaseStage
 
 	override function beatHit()
 	{
-		//if(curBeat % 2 == 0) abot.beatHit();
+		#if !funkin.vis
+		if(curBeat % 2 == 0) abot.beatHit();
+		#end
 		switch(currentNeneState) {
 			case STATE_READY:
 				if (blinkCountdown == 0)

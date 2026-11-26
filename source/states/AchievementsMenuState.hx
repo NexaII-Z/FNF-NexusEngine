@@ -121,18 +121,32 @@ class AchievementsMenuState extends MusicBeatState
 		add(nameText);
 		
 		_changeSelection();
+
+		#if mobile
+		addTouchPad("LEFT_FULL", "B_C");
+		#end
+
 		super.create();
 		
-		FlxG.camera.follow(camFollow, null, 0.15);
+		FlxG.camera.follow(camFollow, null, 9);
 		FlxG.camera.scroll.y = -FlxG.height;
+	}
+
+	override function closeSubState() {
+		super.closeSubState();
+
+		#if mobile
+		addTouchPad("LEFT_FULL", "B_C");
+		#end
 	}
 
 	function makeAchievement(achievement:String, data:Achievement, unlocked:Bool, mod:String = null)
 	{
+		var unlocked:Bool = Achievements.isUnlocked(achievement);
 		return {
 			name: achievement,
-			displayName: unlocked ? Language.getPhrase('achievement_$achievement', data.name) : '???',
-			description: Language.getPhrase('description_$achievement', data.description),
+			displayName: unlocked ? data.name : '???',
+			description: data.description,
 			curProgress: data.maxScore > 0 ? Achievements.getScore(achievement) : 0,
 			maxProgress: data.maxScore > 0 ? data.maxScore : 0,
 			decProgress: data.maxScore > 0 ? data.maxDecimals : 0,
@@ -196,18 +210,28 @@ class AchievementsMenuState extends MusicBeatState
 					_changeSelection();
 				}
 			}
-			
+
+			#if mobile
+			if(MusicBeatState.getState().touchPad.buttonC.justPressed || controls.RESET && (options[curSelected].unlocked || options[curSelected].curProgress > 0))
+			{
+				removeTouchPad();
+				openSubState(new ResetAchievementSubstate());
+			}
+			#else
 			if(controls.RESET && (options[curSelected].unlocked || options[curSelected].curProgress > 0))
 			{
 				openSubState(new ResetAchievementSubstate());
 			}
+			#end
 		}
 
-		if (controls.BACK) {
+		if (controls.BACK)
+		{
 			FlxG.sound.play(Paths.sound('cancelMenu'));
 			MusicBeatState.switchState(new MainMenuState());
 			goingBack = true;
 		}
+		
 		super.update(elapsed);
 	}
 
@@ -258,6 +282,8 @@ class ResetAchievementSubstate extends MusicBeatSubstate
 
 	public function new()
 	{
+        controls.isInSubstate = true;
+
 		super();
 
 		var bg:FlxSprite = new FlxSprite().makeGraphic(FlxG.width, FlxG.height, FlxColor.BLACK);
@@ -266,7 +292,7 @@ class ResetAchievementSubstate extends MusicBeatSubstate
 		add(bg);
 		FlxTween.tween(bg, {alpha: 0.6}, 0.4, {ease: FlxEase.quartInOut});
 
-		var text:Alphabet = new Alphabet(0, 180, Language.getPhrase('reset_achievement', 'Reset Achievement:'), true);
+		var text:Alphabet = new Alphabet(0, 180, "Reset Achievement:", true);
 		text.screenCenter(X);
 		text.scrollFactor.set();
 		add(text);
@@ -278,18 +304,22 @@ class ResetAchievementSubstate extends MusicBeatSubstate
 		text.borderSize = 2;
 		add(text);
 		
-		yesText = new Alphabet(0, text.y + 120, Language.getPhrase('Yes'), true);
+		yesText = new Alphabet(0, text.y + 120, 'Yes', true);
 		yesText.screenCenter(X);
 		yesText.x -= 200;
 		yesText.scrollFactor.set();
 		for(letter in yesText.letters) letter.color = FlxColor.RED;
 		add(yesText);
-		noText = new Alphabet(0, text.y + 120, Language.getPhrase('No'), true);
+		noText = new Alphabet(0, text.y + 120, 'No', true);
 		noText.screenCenter(X);
 		noText.x += 200;
 		noText.scrollFactor.set();
 		add(noText);
 		updateOptions();
+
+		#if mobile
+		addTouchPad("LEFT_RIGHT", "A_B");
+		#end
 	}
 
 	override function update(elapsed:Float)
@@ -297,13 +327,15 @@ class ResetAchievementSubstate extends MusicBeatSubstate
 		if(controls.BACK)
 		{
 			close();
+            controls.isInSubstate = false;
 			FlxG.sound.play(Paths.sound('cancelMenu'));
 			return;
 		}
 
 		super.update(elapsed);
 
-		if(controls.UI_LEFT_P || controls.UI_RIGHT_P) {
+		if(controls.UI_LEFT_P || controls.UI_RIGHT_P)
+		{
 			onYes = !onYes;
 			updateOptions();
 		}
@@ -332,11 +364,13 @@ class ResetAchievementSubstate extends MusicBeatSubstate
 						onUpdate: function(twn:FlxTween) state.progressBar.updateBar()
 					});
 				}
+				
 				Achievements.save();
 				FlxG.save.flush();
 
 				FlxG.sound.play(Paths.sound('cancelMenu'));
 			}
+            controls.isInSubstate = false;
 			close();
 			return;
 		}

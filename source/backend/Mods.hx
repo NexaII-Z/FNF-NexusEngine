@@ -1,7 +1,5 @@
 package backend;
 
-import openfl.utils.Assets;
-
 import haxe.Json;
 
 typedef ModsList = {
@@ -13,7 +11,7 @@ typedef ModsList = {
 class Mods
 {
 	static public var currentModDirectory:String = '';
-	public static final ignoreModFolders:Array<String> = [
+	public static var ignoreModFolders:Array<String> = [
 		'characters',
 		'custom_events',
 		'custom_notetypes',
@@ -53,7 +51,7 @@ class Mods
 		#if MODS_ALLOWED
 		var modsFolder:String = Paths.mods();
 		if(FileSystem.exists(modsFolder)) {
-			for (folder in FileSystem.readDirectory(modsFolder))
+			for (folder in Paths.readDirectory(modsFolder))
 			{
 				var path = haxe.io.Path.join([modsFolder, folder]);
 				if (FileSystem.isDirectory(path) && !ignoreModFolders.contains(folder.toLowerCase()) && !list.contains(folder))
@@ -64,7 +62,7 @@ class Mods
 		return list;
 	}
 	
-	inline public static function mergeAllTextsNamed(path:String, ?defaultDirectory:String = null, allowDuplicates:Bool = false)
+	inline public static function mergeAllTextsNamed(path:String, defaultDirectory:String = null, allowDuplicates:Bool = false)
 	{
 		if(defaultDirectory == null) defaultDirectory = Paths.getSharedPath();
 		defaultDirectory = defaultDirectory.trim();
@@ -94,17 +92,10 @@ class Mods
 	inline public static function directoriesWithFile(path:String, fileToFind:String, mods:Bool = true)
 	{
 		var foldersToCheck:Array<String> = [];
-		//Main folder
+		#if sys
 		if(FileSystem.exists(path + fileToFind))
+		#end
 			foldersToCheck.push(path + fileToFind);
-
-		// Week folder
-		if(Paths.currentLevel != null && Paths.currentLevel != path)
-		{
-			var pth:String = Paths.getFolderPath(fileToFind, Paths.currentLevel);
-			if(!foldersToCheck.contains(pth) && FileSystem.exists(pth))
-				foldersToCheck.push(pth);
-		}
 
 		#if MODS_ALLOWED
 		if(mods)

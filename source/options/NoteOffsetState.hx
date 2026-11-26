@@ -115,7 +115,7 @@ class NoteOffsetState extends MusicBeatState
 		repositionCombo();
 
 		// Note delay stuff
-		beatText = new Alphabet(0, 0, Language.getPhrase('delay_beat_hit', 'Beat Hit!'), true);
+		beatText = new Alphabet(0, 0, 'Beat Hit!', true);
 		beatText.setScale(0.6, 0.6);
 		beatText.x += 260;
 		beatText.alpha = 0;
@@ -170,6 +170,11 @@ class NoteOffsetState extends MusicBeatState
 		Conductor.bpm = 128.0;
 		FlxG.sound.playMusic(Paths.music('offsetSong'), 1, true);
 
+		#if mobile
+		addTouchPad("LEFT_FULL", "A_B_C");
+		addTouchPadCamera();
+		#end
+
 		super.create();
 	}
 
@@ -177,8 +182,8 @@ class NoteOffsetState extends MusicBeatState
 	var onComboMenu:Bool = true;
 	var holdingObjectType:Null<Bool> = null;
 
-	var startMousePos:FlxPoint = new FlxPoint();
-	var startComboOffset:FlxPoint = new FlxPoint();
+	var startMousePos:FlxPoint = FlxPoint.get();
+	var startComboOffset:FlxPoint = FlxPoint.get();
 
 	override public function update(elapsed:Float)
 	{
@@ -346,6 +351,16 @@ class NoteOffsetState extends MusicBeatState
 				}
 			}
 
+			#if mobile
+			if(controls.RESET || touchPad.buttonC.justPressed)
+			{
+				for (i in 0...ClientPrefs.data.comboOffset.length)
+				{
+					ClientPrefs.data.comboOffset[i] = 0;
+				}
+				repositionCombo();
+			}
+			#else
 			if(controls.RESET)
 			{
 				for (i in 0...ClientPrefs.data.comboOffset.length)
@@ -354,6 +369,7 @@ class NoteOffsetState extends MusicBeatState
 				}
 				repositionCombo();
 			}
+			#end
 		}
 		else
 		{
@@ -384,7 +400,7 @@ class NoteOffsetState extends MusicBeatState
 				updateNoteDelay();
 			}
 
-			if(controls.RESET)
+			if(controls.RESET || touchPad.buttonC.justPressed)
 			{
 				holdTime = 0;
 				barPercent = 0;
@@ -499,9 +515,9 @@ class NoteOffsetState extends MusicBeatState
 		{
 			switch(i)
 			{
-				case 0: dumbTexts.members[i].text = Language.getPhrase('combo_rating_offset', 'Rating Offset:');
+				case 0: dumbTexts.members[i].text = 'Rating Offset:';
 				case 1: dumbTexts.members[i].text = '[' + ClientPrefs.data.comboOffset[0] + ', ' + ClientPrefs.data.comboOffset[1] + ']';
-				case 2: dumbTexts.members[i].text = Language.getPhrase('combo_numbers_offset', 'Numbers Offset:');
+				case 2: dumbTexts.members[i].text = 'Numbers Offset:';
 				case 3: dumbTexts.members[i].text = '[' + ClientPrefs.data.comboOffset[2] + ', ' + ClientPrefs.data.comboOffset[3] + ']';
 			}
 		}
@@ -510,7 +526,7 @@ class NoteOffsetState extends MusicBeatState
 	function updateNoteDelay()
 	{
 		ClientPrefs.data.noteOffset = Math.round(barPercent);
-		timeTxt.text = Language.getPhrase('delay_current_offset', 'Current offset: {1} ms', [Math.floor(barPercent)]);
+		timeTxt.text = 'Current offset: ' + Math.floor(barPercent) + ' ms';
 	}
 
 	function updateMode()
@@ -534,14 +550,18 @@ class NoteOffsetState extends MusicBeatState
 		var str:String;
 		var str2:String;
 		if(onComboMenu)
-			str = Language.getPhrase('combo_offset', 'Combo Offset');
+			str = 'Combo Offset';
 		else
-			str = Language.getPhrase('note_delay', 'Note/Beat Delay');
+			str = 'Note/Beat Delay';
 
-		if(!controls.controllerMode)
-			str2 = Language.getPhrase('switch_on_accept', '(Press Accept to Switch)');
-		else
-			str2 = Language.getPhrase('switch_on_start', '(Press Start to Switch)');
+                if (controls.mobileC) {
+					str2 = '(Press A to Switch)';
+                } else {
+					if(!controls.controllerMode)
+						str2 = '(Press Accept to Switch)';
+					else
+						str2 = '(Press Start to Switch)';
+                }
 
 		changeModeText.text = '< ${str.toUpperCase()} ${str2.toUpperCase()} >';
 	}

@@ -17,7 +17,7 @@ class MasterEditorMenu extends MusicBeatState
 		'Menu Character Editor',
 		'Dialogue Editor',
 		'Dialogue Portrait Editor',
-		'Note Splash Editor'
+		'Note Splash Debug'
 	];
 	private var grpTexts:FlxTypedGroup<Alphabet>;
 	private var directories:Array<String> = [null];
@@ -73,6 +73,15 @@ class MasterEditorMenu extends MusicBeatState
 		changeSelection();
 
 		FlxG.mouse.visible = false;
+
+		#if mobile
+		#if MODS_ALLOWED
+		addTouchPad("LEFT_FULL", "A_B");
+		#else
+		addTouchPad("UP_DOWN", "A_B");
+		#end
+		#end
+
 		super.create();
 	}
 
@@ -86,6 +95,7 @@ class MasterEditorMenu extends MusicBeatState
 		{
 			changeSelection(1);
 		}
+		
 		#if MODS_ALLOWED
 		if(controls.UI_LEFT_P)
 		{
@@ -107,10 +117,10 @@ class MasterEditorMenu extends MusicBeatState
 			switch(options[curSelected]) {
 				case 'Chart Editor'://felt it would be cool maybe
 					LoadingState.loadAndSwitchState(new ChartingState(), false);
+				case 'Stage Editor':// this is bull shit
+					MusicBeatState.switchState(new StageEditorState());
 				case 'Character Editor':
 					LoadingState.loadAndSwitchState(new CharacterEditorState(Character.DEFAULT_CHARACTER, false));
-				case 'Stage Editor':
-					LoadingState.loadAndSwitchState(new StageEditorState());
 				case 'Week Editor':
 					MusicBeatState.switchState(new WeekEditorState());
 				case 'Menu Character Editor':
@@ -119,19 +129,27 @@ class MasterEditorMenu extends MusicBeatState
 					LoadingState.loadAndSwitchState(new DialogueEditorState(), false);
 				case 'Dialogue Portrait Editor':
 					LoadingState.loadAndSwitchState(new DialogueCharacterEditorState(), false);
-				case 'Note Splash Editor':
-					MusicBeatState.switchState(new NoteSplashEditorState());
+				case 'Note Splash Debug':
+					MusicBeatState.switchState(new NoteSplashDebugState());
 			}
 			FlxG.sound.music.volume = 0;
 			FreeplayState.destroyFreeplayVocals();
 		}
 		
-		for (num => item in grpTexts.members)
+		var bullShit:Int = 0;
+		for (item in grpTexts.members)
 		{
-			item.targetY = num - curSelected;
+			item.targetY = bullShit - curSelected;
+			bullShit++;
+
 			item.alpha = 0.6;
+			// item.setGraphicSize(Std.int(item.width * 0.8));
+
 			if (item.targetY == 0)
+			{
 				item.alpha = 1;
+				// item.setGraphicSize(Std.int(item.width));
+			}
 		}
 		super.update(elapsed);
 	}
@@ -139,7 +157,13 @@ class MasterEditorMenu extends MusicBeatState
 	function changeSelection(change:Int = 0)
 	{
 		FlxG.sound.play(Paths.sound('scrollMenu'), 0.4);
-		curSelected = FlxMath.wrap(curSelected + change, 0, options.length - 1);
+
+		curSelected += change;
+
+		if (curSelected < 0)
+			curSelected = options.length - 1;
+		if (curSelected >= options.length)
+			curSelected = 0;
 	}
 
 	#if MODS_ALLOWED

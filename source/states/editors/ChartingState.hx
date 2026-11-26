@@ -644,7 +644,7 @@ class ChartingState extends MusicBeatState
 
 		UI_box.addGroup(tab_group_song);
 
-		initPsychCamera().follow(camPos, LOCKON, 999);
+		initNexusCamera().follow(camPos, LOCKON, 999);
 	}
 
 	var stepperBeats:FlxUINumericStepper;

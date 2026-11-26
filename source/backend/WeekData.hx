@@ -21,11 +21,18 @@ typedef WeekFile =
 	var difficulties:String;
 }
 
-class WeekData {
+/**
+ * A week as shown in Story Mode / Freeplay.
+ * Base game weeks come from  assets/shared/nexus/weeks/  and mod weeks from  mods/<mod>/weeks/.
+ */
+class WeekData
+{
 	public static var weeksLoaded:Map<String, WeekData> = new Map<String, WeekData>();
 	public static var weeksList:Array<String> = [];
+
+	/** The mod folder this week came from ('' for the base game). */
 	public var folder:String = '';
-	
+
 	// JSON variables
 	public var songs:Array<Dynamic>;
 	public var weekCharacters:Array<String>;
@@ -42,8 +49,9 @@ class WeekData {
 
 	public var fileName:String;
 
-	public static function createWeekFile():WeekFile {
-		var weekFile:WeekFile = {
+	public static function createWeekFile():WeekFile
+	{
+		return {
 			songs: [["Bopeebo", "dad", [146, 113, 253]], ["Fresh", "dad", [146, 113, 253]], ["Dad Battle", "dad", [146, 113, 253]]],
 			weekCharacters: ['dad', 'bf', 'gf'],
 			weekBackground: 'stage',
@@ -57,142 +65,134 @@ class WeekData {
 			hideFreeplay: false,
 			difficulties: ''
 		};
-		return weekFile;
 	}
 
-	// HELP: Is there any way to convert a WeekFile to WeekData without having to put all variables there manually? I'm kind of a noob in haxe lmao
-	public function new(weekFile:WeekFile, fileName:String) {
-		// here ya go - MiguelItsOut
+	/** Copies every field of the json file that this class also has. */
+	public function new(weekFile:WeekFile, fileName:String)
+	{
+		var own:Array<String> = Reflect.fields(this);
 		for (field in Reflect.fields(weekFile))
-			if(Reflect.fields(this).contains(field)) // Reflect.hasField() won't fucking work :/
+			if (own.contains(field))
 				Reflect.setProperty(this, field, Reflect.getProperty(weekFile, field));
 
 		this.fileName = fileName;
 	}
 
-	public static function reloadWeekFiles(isStoryMode:Null<Bool> = false)
+	// ---- loading -------------------------------------------------------------------
+
+	public static function reloadWeekFiles(isStoryMode:Null<Bool> = false):Void
 	{
 		weeksList = [];
 		weeksLoaded.clear();
-		#if MODS_ALLOWED
-		var directories:Array<String> = [Paths.mods(), Paths.getSharedPath()];
-		var originalLength:Int = directories.length;
 
+		// Search order: mods root, base game, then every enabled mod.
+		var sources:Array<String> = [];
+		#if MODS_ALLOWED
+		sources.push(Paths.mods());
+		#end
+		sources.push(Paths.getSharedPath());
+		var firstModIndex:Int = sources.length;
+
+		#if MODS_ALLOWED
 		for (mod in Mods.parseList().enabled)
-			directories.push(Paths.mods(mod + '/'));
-		#else
-		var directories:Array<String> = [Paths.getSharedPath()];
-		var originalLength:Int = directories.length;
+			sources.push(Paths.mods(mod + '/'));
 		#end
 
-		var sexList:Array<String> = CoolUtil.coolTextFile(Paths.getSharedPath('weeks/weekList.txt'));
-		for (i in 0...sexList.length) {
-			for (j in 0...directories.length) {
-				var fileToCheck:String = directories[j] + 'weeks/' + sexList[i] + '.json';
-				if(!weeksLoaded.exists(sexList[i])) {
-					var week:WeekFile = getWeekFile(fileToCheck);
-					if(week != null) {
-						var weekFile:WeekData = new WeekData(week, sexList[i]);
-
-						#if MODS_ALLOWED
-						if(j >= originalLength) {
-							weekFile.folder = directories[j].substring(Paths.mods().length, directories[j].length-1);
-						}
-						#end
-
-						if(weekFile != null && (isStoryMode == null || (isStoryMode && !weekFile.hideStoryMode) || (!isStoryMode && !weekFile.hideFreeplay))) {
-							weeksLoaded.set(sexList[i], weekFile);
-							weeksList.push(sexList[i]);
-						}
-					}
-				}
-			}
-		}
-
-		#if MODS_ALLOWED
-		for (i in 0...directories.length) {
-			var directory:String = directories[i] + 'weeks/';
-			if(FileSystem.exists(directory)) {
-				var listOfWeeks:Array<String> = CoolUtil.coolTextFile(directory + 'weekList.txt');
-				for (daWeek in listOfWeeks)
-				{
-					var path:String = directory + daWeek + '.json';
-					if(FileSystem.exists(path))
-					{
-						addWeek(daWeek, path, directories[i], i, originalLength);
-					}
-				}
-
-				for (file in Paths.readDirectory(directory))
-				{
-					var path = haxe.io.Path.join([directory, file]);
-					if (!FileSystem.isDirectory(path) && file.endsWith('.json'))
-					{
-						addWeek(file.substr(0, file.length - 5), path, directories[i], i, originalLength);
-					}
-				}
-			}
-		}
-		#end
-	}
-
-	private static function addWeek(weekToCheck:String, path:String, directory:String, i:Int, originalLength:Int)
-	{
-		if(!weeksLoaded.exists(weekToCheck))
+		// 1) weeks named in the base game's weekList.txt keep that order
+		for (name in CoolUtil.coolTextFile(weeksFolder(Paths.getSharedPath()) + 'weekList.txt'))
 		{
-			var week:WeekFile = getWeekFile(path);
-			if(week != null)
+			for (i in 0...sources.length)
+				registerWeek(name, weeksFolder(sources[i]) + name + '.json', sources[i], i >= firstModIndex, isStoryMode);
+		}
+
+		// 2) weeks from other folders / mods
+		#if MODS_ALLOWED
+		for (i in 0...sources.length)
+		{
+			var directory:String = weeksFolder(sources[i]);
+			if (!FileSystem.exists(directory)) continue;
+
+			for (name in CoolUtil.coolTextFile(directory + 'weekList.txt'))
+				registerWeek(name, directory + name + '.json', sources[i], i >= firstModIndex, isStoryMode);
+
+			for (file in Paths.readDirectory(directory))
 			{
-				var weekFile:WeekData = new WeekData(week, weekToCheck);
-				if(i >= originalLength)
-				{
-					#if MODS_ALLOWED
-					weekFile.folder = directory.substring(Paths.mods().length, directory.length-1);
-					#end
-				}
-				if((PlayState.isStoryMode && !weekFile.hideStoryMode) || (!PlayState.isStoryMode && !weekFile.hideFreeplay))
-				{
-					weeksLoaded.set(weekToCheck, weekFile);
-					weeksList.push(weekToCheck);
-				}
+				var path:String = haxe.io.Path.join([directory, file]);
+				if (!FileSystem.isDirectory(path) && file.endsWith('.json'))
+					registerWeek(file.substr(0, file.length - 5), path, sources[i], i >= firstModIndex, isStoryMode);
 			}
 		}
+		#end
 	}
 
-	private static function getWeekFile(path:String):WeekFile {
-		var rawJson:String = null;
+	/** "<source>weeks/", sending the base game folder through the Nexus layout. */
+	static function weeksFolder(source:String):String
+	{
+		return (source == Paths.getSharedPath()) ? Paths.getSharedPath('weeks/') : source + 'weeks/';
+	}
+
+	static function registerWeek(name:String, path:String, source:String, fromMod:Bool, isStoryMode:Null<Bool>):Void
+	{
+		if (weeksLoaded.exists(name)) return;
+
+		var file:WeekFile = readWeekFile(path);
+		if (file == null) return;
+
+		var week:WeekData = new WeekData(file, name);
 		#if MODS_ALLOWED
-		if(FileSystem.exists(path)) {
-			rawJson = File.getContent(path);
-		}
-		#else
-		if(OpenFlAssets.exists(path)) {
-			rawJson = Assets.getText(path);
-		}
+		if (fromMod) week.folder = source.substring(Paths.mods().length, source.length - 1);
 		#end
 
-		if(rawJson != null && rawJson.length > 0) {
-			return cast tjson.TJSON.parse(rawJson);
+		var visible:Bool = isStoryMode == null
+			|| (isStoryMode && !week.hideStoryMode)
+			|| (!isStoryMode && !week.hideFreeplay);
+
+		if (!visible) return;
+
+		weeksLoaded.set(name, week);
+		weeksList.push(name);
+	}
+
+	static function readWeekFile(path:String):WeekFile
+	{
+		var raw:String = null;
+
+		#if MODS_ALLOWED
+		if (FileSystem.exists(path)) raw = File.getContent(path);
+		#else
+		if (OpenFlAssets.exists(path)) raw = Assets.getText(path);
+		#end
+
+		if (raw == null || raw.length < 1) return null;
+
+		try
+		{
+			return cast tjson.TJSON.parse(raw);
+		}
+		catch (e:Dynamic)
+		{
+			trace('Could not read week file "$path": $e');
 		}
 		return null;
 	}
 
-	//   FUNCTIONS YOU WILL PROBABLY NEVER NEED TO USE
+	// ---- current week ------------------------------------------------------------------
 
-	//To use on PlayState.hx or Highscore stuff
-	public static function getWeekFileName():String {
+	/** File name (without .json) of the week being played. */
+	public static function getWeekFileName():String
+	{
 		return weeksList[PlayState.storyWeek];
 	}
 
-	//Used on LoadingState, nothing really too relevant
-	public static function getCurrentWeek():WeekData {
+	public static function getCurrentWeek():WeekData
+	{
 		return weeksLoaded.get(weeksList[PlayState.storyWeek]);
 	}
 
-	public static function setDirectoryFromWeek(?data:WeekData = null) {
+	public static function setDirectoryFromWeek(?data:WeekData = null):Void
+	{
 		Mods.currentModDirectory = '';
-		if(data != null && data.folder != null && data.folder.length > 0) {
+		if (data != null && data.folder != null && data.folder.length > 0)
 			Mods.currentModDirectory = data.folder;
-		}
 	}
 }

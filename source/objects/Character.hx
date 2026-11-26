@@ -1,6 +1,6 @@
 package objects;
 
-import backend.animation.PsychAnimationController;
+import backend.animation.NexusAnimationController;
 
 import flixel.util.FlxSort;
 import flixel.util.FlxDestroyUtil;
@@ -84,7 +84,7 @@ class Character extends FlxSprite
 	{
 		super(x, y);
 
-		animation = new PsychAnimationController(this);
+		animation = new NexusAnimationController(this);
 
 		animOffsets = new Map<String, Array<Dynamic>>();
 		curCharacter = character;

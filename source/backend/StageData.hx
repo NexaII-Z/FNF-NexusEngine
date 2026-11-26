@@ -4,7 +4,8 @@ import openfl.utils.Assets;
 import haxe.Json;
 import backend.Song;
 
-typedef StageFile = {
+typedef StageFile =
+{
 	var directory:String;
 	var defaultZoom:Float;
 	var isPixelStage:Bool;
@@ -21,7 +22,28 @@ typedef StageFile = {
 	var camera_speed:Null<Float>;
 }
 
-class StageData {
+/**
+ * Stage json lookup. Base game stages live in assets/shared/nexus/stages/,
+ * mod stages in mods/<mod>/stages/.
+ */
+class StageData
+{
+	public static var forceNextDirectory:String = null;
+
+	// Which stage the base game songs use when a chart does not name one.
+	static final SONG_STAGES:Map<String, String> = [
+		'spookeez' => 'spooky', 'south' => 'spooky', 'monster' => 'spooky',
+		'pico' => 'philly', 'blammed' => 'philly', 'philly' => 'philly', 'philly-nice' => 'philly',
+		'milf' => 'limo', 'satin-panties' => 'limo', 'high' => 'limo',
+		'cocoa' => 'mall', 'eggnog' => 'mall',
+		'winter-horrorland' => 'mallEvil',
+		'senpai' => 'school', 'roses' => 'school',
+		'thorns' => 'schoolEvil',
+		'ugh' => 'tank', 'guns' => 'tank', 'stress' => 'tank',
+		'2hot' => 'phillyStreets', 'darnell' => 'phillyStreets', 'lit-up' => 'phillyStreets',
+		'blazin' => 'phillyBlazin'
+	];
+
 	public static function dummy():StageFile
 	{
 		return {
@@ -42,97 +64,39 @@ class StageData {
 		};
 	}
 
-	public static var forceNextDirectory:String = null;
-	public static function loadDirectory(SONG:SwagSong) {
-		var stage:String = '';
-		if(SONG.stage != null) {
+	/** Remembers the asset folder of the stage this song uses (read later by LoadingState). */
+	public static function loadDirectory(SONG:SwagSong):Void
+	{
+		var stage:String = 'stage';
+		if (SONG.stage != null)
 			stage = SONG.stage;
-		} else if(SONG.song != null) {
-			switch (SONG.song.toLowerCase().replace(' ', '-'))
-			{
-				case 'spookeez' | 'south' | 'monster':
-					stage = 'spooky';
-				case 'pico' | 'blammed' | 'philly' | 'philly-nice':
-					stage = 'philly';
-				case 'milf' | 'satin-panties' | 'high':
-					stage = 'limo';
-				case 'cocoa' | 'eggnog':
-					stage = 'mall';
-				case 'winter-horrorland':
-					stage = 'mallEvil';
-				case 'senpai' | 'roses':
-					stage = 'school';
-				case 'thorns':
-					stage = 'schoolEvil';
-				case 'ugh' | 'guns' | 'stress':
-					stage = 'tank';
-				case '2hot' | 'darnell' | 'lit-up':
-					stage = 'phillyStreets';
-				case 'blazin':
-					stage = 'phillyBlazin';
-				default:
-					stage = 'stage';
-			}
-		} else {
-			stage = 'stage';
-		}
+		else if (SONG.song != null)
+			stage = vanillaSongStage(SONG.song.toLowerCase().replace(' ', '-'));
 
-		var stageFile:StageFile = getStageFile(stage);
-		if(stageFile == null) { //preventing crashes
-			forceNextDirectory = '';
-		} else {
-			forceNextDirectory = stageFile.directory;
-		}
+		var file:StageFile = getStageFile(stage);
+		forceNextDirectory = (file == null) ? '' : file.directory; // an empty directory prevents crashes
 	}
 
-	public static function getStageFile(stage:String):StageFile {
-		var rawJson:String = null;
+	public static function getStageFile(stage:String):StageFile
+	{
+		var raw:String = null;
 		var path:String = Paths.getSharedPath('stages/' + stage + '.json');
 
 		#if MODS_ALLOWED
 		var modPath:String = Paths.modFolders('stages/' + stage + '.json');
-		if(FileSystem.exists(modPath)) {
-			rawJson = File.getContent(modPath);
-		} else if(FileSystem.exists(path)) {
-			rawJson = File.getContent(path);
-		}
+		if (FileSystem.exists(modPath)) raw = File.getContent(modPath);
+		else if (FileSystem.exists(path)) raw = File.getContent(path);
 		#else
-		if(Assets.exists(path)) {
-			rawJson = Assets.getText(path);
-		}
+		if (Assets.exists(path)) raw = Assets.getText(path);
 		#end
-		else
-		{
-			return null;
-		}
-		return cast tjson.TJSON.parse(rawJson);
+
+		if (raw == null) return null;
+		return cast tjson.TJSON.parse(raw);
 	}
 
 	public static function vanillaSongStage(songName):String
 	{
-		switch (songName)
-		{
-			case 'spookeez' | 'south' | 'monster':
-				return 'spooky';
-			case 'pico' | 'blammed' | 'philly' | 'philly-nice':
-				return 'philly';
-			case 'milf' | 'satin-panties' | 'high':
-				return 'limo';
-			case 'cocoa' | 'eggnog':
-				return 'mall';
-			case 'winter-horrorland':
-				return 'mallEvil';
-			case 'senpai' | 'roses':
-				return 'school';
-			case 'thorns':
-				return 'schoolEvil';
-			case 'ugh' | 'guns' | 'stress':
-				return 'tank';
-			case '2hot' | 'darnell' | 'lit-up':
-				return 'phillyStreets';
-			case 'blazin':
-				return 'phillyBlazin';
-		}
-		return 'stage';
+		var stage:String = SONG_STAGES.get(songName);
+		return (stage != null) ? stage : 'stage';
 	}
 }

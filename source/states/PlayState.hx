@@ -304,7 +304,7 @@ class PlayState extends MusicBeatState
 		guitarHeroSustains = ClientPrefs.data.guitarHeroSustains;
 
 		// var gameCam:FlxCamera = FlxG.camera;
-		camGame = initPsychCamera();
+		camGame = initNexusCamera();
 		camHUD = new FlxCamera();
 		camOther = new FlxCamera();
 		luaTpadCam = new FlxCamera();

@@ -1,12 +1,14 @@
 package backend;
 
-import backend.ClientPrefs;
-
+/**
+ * One judgement tier (sick / good / bad / shit).
+ * Hit windows come from the player's options (ClientPrefs.data.<name>Window).
+ */
 class Rating
 {
 	public var name:String = '';
 	public var image:String = '';
-	public var hitWindow:Null<Int> = 0; //ms
+	public var hitWindow:Null<Int> = 0; // milliseconds
 	public var ratingMod:Float = 1;
 	public var score:Int = 350;
 	public var noteSplash:Bool = true;
@@ -16,37 +18,41 @@ class Rating
 	{
 		this.name = name;
 		this.image = name;
-		this.hitWindow = 0;
+		this.hitWindow = readWindow(name);
+	}
 
-		var window:String = name + 'Window';
+	static function readWindow(name:String):Null<Int>
+	{
 		try
 		{
-			this.hitWindow = Reflect.field(ClientPrefs.data, window);
+			return Reflect.field(ClientPrefs.data, name + 'Window');
 		}
-		catch(e) FlxG.log.error(e);
+		catch (e)
+		{
+			FlxG.log.error(e);
+		}
+		return 0;
 	}
+
+	// Highest tier first. Only the best tier spawns note splashes.
+	static final TIERS:Array<{name:String, mod:Float, score:Int, splash:Bool}> = [
+		{name: 'sick', mod: 1.00, score: 350, splash: true},
+		{name: 'good', mod: 0.67, score: 200, splash: false},
+		{name: 'bad', mod: 0.34, score: 100, splash: false},
+		{name: 'shit', mod: 0.00, score: 50, splash: false}
+	];
 
 	public static function loadDefault():Array<Rating>
 	{
-		var ratingsData:Array<Rating> = [new Rating('sick')]; //highest rating goes first
-
-		var rating:Rating = new Rating('good');
-		rating.ratingMod = 0.67;
-		rating.score = 200;
-		rating.noteSplash = false;
-		ratingsData.push(rating);
-
-		var rating:Rating = new Rating('bad');
-		rating.ratingMod = 0.34;
-		rating.score = 100;
-		rating.noteSplash = false;
-		ratingsData.push(rating);
-
-		var rating:Rating = new Rating('shit');
-		rating.ratingMod = 0;
-		rating.score = 50;
-		rating.noteSplash = false;
-		ratingsData.push(rating);
-		return ratingsData;
+		var list:Array<Rating> = [];
+		for (tier in TIERS)
+		{
+			var rating:Rating = new Rating(tier.name);
+			rating.ratingMod = tier.mod;
+			rating.score = tier.score;
+			rating.noteSplash = tier.splash;
+			list.push(rating);
+		}
+		return list;
 	}
 }

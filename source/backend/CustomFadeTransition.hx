@@ -3,13 +3,21 @@ package backend;
 import flixel.util.FlxGradient;
 import flixel.FlxSubState;
 
-class CustomFadeTransition extends FlxSubState {
+/**
+ * The swipe used when moving between states: a black wall with a soft gradient edge
+ * that slides down the screen (closing in) or off it (opening up).
+ */
+class CustomFadeTransition extends FlxSubState
+{
+	/** Runs once when the swipe reaches the end. */
 	public static var finishCallback:Void->Void;
+
 	var isTransIn:Bool = false;
 	var transBlack:FlxSprite;
 	var transGradient:FlxSprite;
 
 	var duration:Float;
+
 	public function new(duration:Float, isTransIn:Bool)
 	{
 		this.duration = duration;
@@ -19,9 +27,13 @@ class CustomFadeTransition extends FlxSubState {
 
 	override function create()
 	{
-		cameras = [FlxG.cameras.list[FlxG.cameras.list.length-1]];
-		var width:Int = Std.int(FlxG.width / Math.max(camera.zoom, 0.001));
-		var height:Int = Std.int(FlxG.height / Math.max(camera.zoom, 0.001));
+		// draw over everything: use the camera that was added last
+		cameras = [FlxG.cameras.list[FlxG.cameras.list.length - 1]];
+
+		var zoom:Float = Math.max(camera.zoom, 0.001);
+		var width:Int = Std.int(FlxG.width / zoom);
+		var height:Int = Std.int(FlxG.height / zoom);
+
 		transGradient = FlxGradient.createGradientFlxSprite(1, height, (isTransIn ? [0x0, FlxColor.BLACK] : [FlxColor.BLACK, 0x0]));
 		transGradient.scale.x = width;
 		transGradient.updateHitbox();
@@ -36,33 +48,30 @@ class CustomFadeTransition extends FlxSubState {
 		transBlack.screenCenter(X);
 		add(transBlack);
 
-		if(isTransIn)
-			transGradient.y = transBlack.y - transBlack.height;
-		else
-			transGradient.y = -transGradient.height;
+		transGradient.y = isTransIn ? transBlack.y - transBlack.height : -transGradient.height;
 
 		super.create();
 	}
 
-	override function update(elapsed:Float) {
+	override function update(elapsed:Float)
+	{
 		super.update(elapsed);
 
-		final height:Float = FlxG.height * Math.max(camera.zoom, 0.001);
-		final targetPos:Float = transGradient.height + 50 * Math.max(camera.zoom, 0.001);
-		if(duration > 0)
-			transGradient.y += (height + targetPos) * elapsed / duration;
-		else
-			transGradient.y = (targetPos) * elapsed;
+		final zoom:Float = Math.max(camera.zoom, 0.001);
+		final screenHeight:Float = FlxG.height * zoom;
+		final endPosition:Float = transGradient.height + 50 * zoom;
 
-		if(isTransIn)
-			transBlack.y = transGradient.y + transGradient.height;
+		if (duration > 0)
+			transGradient.y += (screenHeight + endPosition) * elapsed / duration;
 		else
-			transBlack.y = transGradient.y - transBlack.height;
+			transGradient.y = endPosition * elapsed;
 
-		if(transGradient.y >= targetPos)
+		transBlack.y = isTransIn ? transGradient.y + transGradient.height : transGradient.y - transBlack.height;
+
+		if (transGradient.y >= endPosition)
 		{
 			close();
-			if(finishCallback != null) finishCallback();
+			if (finishCallback != null) finishCallback();
 			finishCallback = null;
 		}
 	}

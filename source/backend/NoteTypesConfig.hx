@@ -2,129 +2,145 @@ package backend;
 
 import objects.Note;
 
-typedef NoteTypeProperty = {
+typedef NoteTypeProperty =
+{
 	property:Array<String>,
 	value:Dynamic
 }
 
+/**
+ * Note types can be described with a plain text file (custom_notetypes/<name>.txt)
+ * instead of a script. Each line looks like:
+ *
+ *     hitHealth = 0.1
+ *     extraData.speed: 2
+ *     scale.x = 1.5
+ *
+ * The file is parsed once and its properties are applied to every note of that type.
+ */
 class NoteTypesConfig
 {
 	private static var noteTypesData:Map<String, Array<NoteTypeProperty>> = new Map<String, Array<NoteTypeProperty>>();
-	public static function clearNoteTypesData()
-		noteTypesData.clear();
 
-	public static function loadNoteTypeData(name:String)
+	public static function clearNoteTypesData():Void
 	{
-		if(noteTypesData.exists(name)) return noteTypesData.get(name);
+		noteTypesData.clear();
+	}
 
-		var str:String = Paths.getTextFromFile('custom_notetypes/$name.txt');
-		if(str == null || !str.contains(':') || !str.contains('=')) noteTypesData.set(name, null);
+	public static function loadNoteTypeData(name:String):Array<NoteTypeProperty>
+	{
+		if (noteTypesData.exists(name)) return noteTypesData.get(name);
+
+		var text:String = Paths.getTextFromFile('custom_notetypes/$name.txt');
+		if (text == null || !text.contains(':') || !text.contains('='))
+		{
+			noteTypesData.set(name, null);
+			return null;
+		}
 
 		var parsed:Array<NoteTypeProperty> = [];
-		var lines:Array<String> = CoolUtil.listFromString(str);
-		for (line in lines)
+		for (line in CoolUtil.listFromString(text))
 		{
-			var sep:Int = line.indexOf(':');
-			if(sep < 0)
-			{
-				sep = line.indexOf('=');
-				if(sep < 0) continue;
-			}
+			var separator:Int = line.indexOf(':');
+			if (separator < 0) separator = line.indexOf('=');
+			if (separator < 0) continue;
 
-			var arr:Array<String> = line.substr(0, sep).trim().split('.');
-			for (i in 0...arr.length) arr[i] = arr[i].trim();
-
-			var newProp:NoteTypeProperty = {
-				property: arr,
-				value: _interpretValue(line.substr(sep + 1).trim())
-			}
-			//trace('pushing $newProp');
-			parsed.push(newProp);
+			var path:Array<String> = [for (part in line.substr(0, separator).split('.')) part.trim()];
+			parsed.push({
+				property: path,
+				value: interpretValue(line.substr(separator + 1).trim())
+			});
 		}
+
 		noteTypesData.set(name, parsed);
 		return parsed;
 	}
 
-	public static function applyNoteTypeData(note:Note, name:String)
+	public static function applyNoteTypeData(note:Note, name:String):Void
 	{
 		var data:Array<NoteTypeProperty> = loadNoteTypeData(name);
-		if(data == null || data.length < 1) return;
-		
-		for (line in data) 
+		if (data == null || data.length < 1) return;
+
+		for (entry in data)
 		{
-			var obj:Dynamic = note;
-			var split:Array<String> = line.property;
+			var path:Array<String> = entry.property;
 			try
 			{
-				if(split.length <= 1)
+				if (path.length == 1)
 				{
-					_propCheckArray(obj, split[0], true, line.value);
+					assign(note, path[0], entry.value);
 					continue;
 				}
 
-				switch(split[0]) // special cases
+				if (path[0] == 'extraData')
 				{
-					case 'extraData': 
-						note.extraData.set(split[1], line.value);
-						continue;
-					
-					case 'noteType':
-						continue;
+					note.extraData.set(path[1], entry.value);
+					continue;
 				}
+				if (path[0] == 'noteType') continue;
 
-				for (i in 0...split.length-1)
-				{
-					if(i < split.length-1)
-						obj = _propCheckArray(obj, split[i]);
-				}
-				_propCheckArray(obj, split[split.length-1], true, line.value);
-			} catch(e) trace(e);
-		}
-	}
-
-	private static function _propCheckArray(obj:Dynamic, slice:String, setProp:Bool = false, valueToSet:Dynamic = null)
-	{
-		var propArray:Array<String> = slice.split('[');
-		if(propArray.length > 1)
-		{
-			for (i in 0...propArray.length)
-			{
-				var str:Dynamic = propArray[i];
-				var id:Int = Std.parseInt(str.substr(0, str.length-1).trim());
-				if(i < propArray.length-1) obj = obj[id]; //middles
-				else if (setProp) return obj[id] = valueToSet; //last
+				var target:Dynamic = note;
+				for (i in 0...path.length - 1)
+					target = fetch(target, path[i]);
+				assign(target, path[path.length - 1], entry.value);
 			}
-			return obj;
+			catch (e)
+			{
+				trace(e);
+			}
 		}
-		else if(setProp)
-		{
-			//trace('setProp: $slice');
-			Reflect.setProperty(obj, slice, valueToSet);
-			return valueToSet;
-		}
-		//trace('getting prop: $slice');
-		return Reflect.getProperty(obj, slice);
 	}
 
-	private static function _interpretValue(value:String):Any
+	// ---- property access ("name" or "name[0][1]") ----------------------------------------
+
+	static function splitIndexed(token:String):{name:String, indices:Array<Int>}
 	{
-		if(value.charAt(0) == "'" || value.charAt(0) == '"')
+		var open:Int = token.indexOf('[');
+		if (open < 0) return {name: token, indices: []};
+
+		var indices:Array<Int> = [];
+		for (piece in token.substr(open).split('['))
 		{
-			//is a string
-			return value.substring(1, value.length-1);
+			if (piece.length < 1) continue;
+			indices.push(Std.parseInt(piece.substr(0, piece.length - 1).trim()));
 		}
-		
-		switch(value)
+		return {name: token.substr(0, open), indices: indices};
+	}
+
+	static function fetch(obj:Dynamic, token:String):Dynamic
+	{
+		var parts = splitIndexed(token);
+		var current:Dynamic = (parts.name.length > 0) ? Reflect.getProperty(obj, parts.name) : obj;
+		for (index in parts.indices) current = current[index];
+		return current;
+	}
+
+	static function assign(obj:Dynamic, token:String, value:Dynamic):Void
+	{
+		var parts = splitIndexed(token);
+		if (parts.indices.length < 1)
 		{
-			case "true":
-				return true;
-			case "false":
-				return false;
-			case "null":
-				return null;
+			Reflect.setProperty(obj, parts.name, value);
+			return;
 		}
 
-		if(value.contains('.')) return Std.parseFloat(value);
-		return Std.parseInt(value);
+		var current:Dynamic = (parts.name.length > 0) ? Reflect.getProperty(obj, parts.name) : obj;
+		for (i in 0...parts.indices.length - 1) current = current[parts.indices[i]];
+		current[parts.indices[parts.indices.length - 1]] = value;
+	}
+
+	static function interpretValue(value:String):Any
+	{
+		var first:String = value.charAt(0);
+		if (first == "'" || first == '"') return value.substring(1, value.length - 1);
+
+		switch (value)
+		{
+			case 'true': return true;
+			case 'false': return false;
+			case 'null': return null;
+		}
+
+		return value.contains('.') ? Std.parseFloat(value) : Std.parseInt(value);
 	}
 }

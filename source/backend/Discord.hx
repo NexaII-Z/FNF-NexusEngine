@@ -5,6 +5,10 @@ import lime.app.Application;
 import hxdiscord_rpc.Discord;
 import hxdiscord_rpc.Types;
 
+/**
+ * Discord Rich Presence. The default client id is the engine's Discord application;
+ * mods can replace it with their own through pack.json ("discordRPC").
+ */
 class DiscordClient
 {
 	public static var isInitialized:Bool = false;
@@ -88,7 +92,7 @@ class DiscordClient
 		presence.details = details;
 		presence.state = state;
 		presence.largeImageKey = 'icon';
-		presence.largeImageText = "Engine Version: " + states.MainMenuState.psychEngineVersion;
+		presence.largeImageText = "Nexus Engine v" + states.MainMenuState.nexusEngineVersion;
 		presence.smallImageKey = smallImageKey;
 		// Obtained times are in milliseconds so they are divided so Discord can use it
 		presence.startTimestamp = Std.int(startTimestamp / 1000);

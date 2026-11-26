@@ -1,62 +1,48 @@
 package backend;
 
+/**
+ * Keeps track of the difficulty names for the current week / song
+ * and turns a difficulty index into a chart file suffix.
+ */
 class Difficulty
 {
-	public static var defaultList(default, never):Array<String> = [
-		'Easy',
-		'Normal',
-		'Hard'
-	];
+	public static var defaultList(default, never):Array<String> = ['Easy', 'Normal', 'Hard'];
 	public static var list:Array<String> = [];
-	private static var defaultDifficulty(default, never):String = 'Normal'; //The chart that has no suffix and starting difficulty on Freeplay/Story Mode
 
-	inline public static function getFilePath(num:Null<Int> = null)
+	// The chart with no suffix, and the difficulty Freeplay / Story Mode start on.
+	private static var defaultDifficulty(default, never):String = 'Normal';
+
+	inline public static function getFilePath(num:Null<Int> = null):String
 	{
-		if(num == null) num = PlayState.storyDifficulty;
-
-		var fileSuffix:String = list[num];
-		if(fileSuffix != defaultDifficulty)
-		{
-			fileSuffix = '-' + fileSuffix;
-		}
-		else
-		{
-			fileSuffix = '';
-		}
-		return Paths.formatToSongPath(fileSuffix);
+		var name:String = getString(num);
+		var suffix:String = (name == defaultDifficulty) ? '' : '-' + name;
+		return Paths.formatToSongPath(suffix);
 	}
 
-	inline public static function loadFromWeek(week:WeekData = null)
+	inline public static function loadFromWeek(week:WeekData = null):Void
 	{
-		if(week == null) week = WeekData.getCurrentWeek();
+		if (week == null) week = WeekData.getCurrentWeek();
 
-		var diffStr:String = week.difficulties;
-		if(diffStr != null && diffStr.length > 0)
+		var raw:String = week.difficulties;
+		if (raw == null || raw.length < 1)
 		{
-			var diffs:Array<String> = diffStr.trim().split(',');
-			var i:Int = diffs.length - 1;
-			while (i > 0)
-			{
-				if(diffs[i] != null)
-				{
-					diffs[i] = diffs[i].trim();
-					if(diffs[i].length < 1) diffs.remove(diffs[i]);
-				}
-				--i;
-			}
-
-			if(diffs.length > 0 && diffs[0].length > 0)
-				list = diffs;
+			resetList();
+			return;
 		}
+
+		var parsed:Array<String> = [for (name in raw.trim().split(',')) name.trim()];
+		parsed = parsed.filter(function(name:String) return name.length > 0);
+
+		if (parsed.length > 0) list = parsed;
 		else resetList();
 	}
 
-	inline public static function resetList()
+	inline public static function resetList():Void
 	{
 		list = defaultList.copy();
 	}
 
-	inline public static function copyFrom(diffs:Array<String>)
+	inline public static function copyFrom(diffs:Array<String>):Void
 	{
 		list = diffs.copy();
 	}

@@ -69,7 +69,7 @@ class CharacterEditorState extends MusicBeatState
 		if(ClientPrefs.data.cacheOnGPU) Paths.clearStoredMemory();
 
 		FlxG.sound.music.stop();
-		camEditor = initPsychCamera();
+		camEditor = initNexusCamera();
 
 		camHUD = new FlxCamera();
 		camHUD.bgColor.alpha = 0;

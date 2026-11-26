@@ -23,13 +23,19 @@ typedef SwagSong =
 	@:optional var gameOverSound:String;
 	@:optional var gameOverLoop:String;
 	@:optional var gameOverEnd:String;
-	
+
 	@:optional var disableNoteRGB:Bool;
 
 	@:optional var arrowSkin:String;
 	@:optional var splashSkin:String;
 }
 
+/**
+ * Loads chart files.
+ * Both chart layouts are accepted:
+ *   {"song": { ...chart... }}   (classic)
+ *   { ...chart... }             (flat, used by newer charts)
+ */
 class Song
 {
 	public var song:String;
@@ -50,39 +56,6 @@ class Song
 	public var player2:String = 'dad';
 	public var gfVersion:String = 'gf';
 
-	private static function onLoadJson(songJson:Dynamic) // Convert old charts to newest format
-	{
-		if(songJson.gfVersion == null)
-		{
-			songJson.gfVersion = songJson.player3;
-			songJson.player3 = null;
-		}
-
-		if(songJson.events == null)
-		{
-			songJson.events = [];
-			for (secNum in 0...songJson.notes.length)
-			{
-				var sec:SwagSection = songJson.notes[secNum];
-
-				var i:Int = 0;
-				var notes:Array<Dynamic> = sec.sectionNotes;
-				var len:Int = notes.length;
-				while(i < len)
-				{
-					var note:Array<Dynamic> = notes[i];
-					if(note[1] < 0)
-					{
-						songJson.events.push([note[0], [[note[2], note[3], note[4]]]]);
-						notes.remove(note);
-						len = notes.length;
-					}
-					else i++;
-				}
-			}
-		}
-	}
-
 	public function new(song, notes, bpm)
 	{
 		this.song = song;
@@ -90,60 +63,84 @@ class Song
 		this.bpm = bpm;
 	}
 
+	// ---- loading -----------------------------------------------------------------
+
 	public static function loadFromJson(jsonInput:String, ?folder:String):SwagSong
 	{
-		var rawJson = null;
-		
-		var formattedFolder:String = Paths.formatToSongPath(folder);
-		var formattedSong:String = Paths.formatToSongPath(jsonInput);
-		#if MODS_ALLOWED
-		var moddyFile:String = Paths.modsJson(formattedFolder + '/' + formattedSong);
-		if(FileSystem.exists(moddyFile)) {
-			rawJson = File.getContent(moddyFile).trim();
-		}
-		#end
+		var chartName:String = Paths.formatToSongPath(jsonInput);
+		var chartFolder:String = Paths.formatToSongPath(folder);
 
-		if(rawJson == null) {
-			var path:String = Paths.json(formattedFolder + '/' + formattedSong);
+		var raw:String = readChartText(chartFolder, chartName);
+		var chart:Dynamic = parseJSONshit(trimTrailingGarbage(raw));
 
-			#if sys
-			if(FileSystem.exists(path))
-				rawJson = File.getContent(path).trim();
-			else
-			#end
-				rawJson = Assets.getText(Paths.json(formattedFolder + '/' + formattedSong)).trim();
-		}
-
-		while (!rawJson.endsWith("}"))
-		{
-			rawJson = rawJson.substr(0, rawJson.length - 1);
-			// LOL GOING THROUGH THE BULLSHIT TO CLEAN IDK WHATS STRANGE
-		}
-
-		// FIX THE CASTING ON WINDOWS/NATIVE
-		// Windows???
-		// trace(songData);
-
-		// trace('LOADED FROM JSON: ' + songData.notes);
-		/* 
-			for (i in 0...songData.notes.length)
-			{
-				trace('LOADED FROM JSON: ' + songData.notes[i].sectionNotes);
-				// songData.notes[i].sectionNotes = songData.notes[i].sectionNotes
-			}
-
-				daNotes = songData.notes;
-				daSong = songData.song;
-				daBpm = songData.bpm; */
-
-		var songJson:Dynamic = parseJSONshit(rawJson);
-		if(jsonInput != 'events') StageData.loadDirectory(songJson);
-		onLoadJson(songJson);
-		return songJson;
+		if (jsonInput != 'events') StageData.loadDirectory(chart);
+		upgradeOldChart(chart);
+		return chart;
 	}
 
 	public static function parseJSONshit(rawJson:String):SwagSong
 	{
-		return cast Json.parse(rawJson).song;
+		var root:Dynamic = Json.parse(rawJson);
+
+		// Classic charts keep the chart under "song"; flat charts use "song" for the title.
+		var wrapped:Dynamic = root.song;
+		if (wrapped != null && !Std.isOfType(wrapped, String)) return cast wrapped;
+		return cast root;
+	}
+
+	static function readChartText(folder:String, name:String):String
+	{
+		#if MODS_ALLOWED
+		var modFile:String = Paths.modsJson(folder + '/' + name);
+		if (FileSystem.exists(modFile)) return File.getContent(modFile).trim();
+		#end
+
+		var path:String = Paths.json(folder + '/' + name);
+
+		#if sys
+		if (FileSystem.exists(path)) return File.getContent(path).trim();
+		#end
+
+		return Assets.getText(path).trim();
+	}
+
+	// Some editors leave stray characters after the closing brace.
+	static function trimTrailingGarbage(raw:String):String
+	{
+		var end:Int = raw.lastIndexOf('}');
+		return (end >= 0) ? raw.substr(0, end + 1) : raw;
+	}
+
+	// ---- old chart formats ----------------------------------------------------------
+
+	/** Converts very old charts (player3, note-based events) to the current layout. */
+	static function upgradeOldChart(chart:Dynamic):Void
+	{
+		if (chart.gfVersion == null)
+		{
+			chart.gfVersion = chart.player3;
+			chart.player3 = null;
+		}
+
+		if (chart.events != null) return;
+
+		chart.events = [];
+		for (sectionIndex in 0...chart.notes.length)
+		{
+			var section:SwagSection = chart.notes[sectionIndex];
+			var sectionNotes:Array<Dynamic> = section.sectionNotes;
+
+			var i:Int = 0;
+			while (i < sectionNotes.length)
+			{
+				var note:Array<Dynamic> = sectionNotes[i];
+				if (note[1] < 0) // notes with a negative lane are events
+				{
+					chart.events.push([note[0], [[note[2], note[3], note[4]]]]);
+					sectionNotes.remove(note);
+				}
+				else i++;
+			}
+		}
 	}
 }

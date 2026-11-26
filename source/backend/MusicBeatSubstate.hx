@@ -2,8 +2,13 @@ package backend;
 
 import flixel.FlxSubState;
 
+/**
+ * Base class of every substate (pause menu, game over, popups).
+ * Same song clock as MusicBeatState, without stages.
+ */
 class MusicBeatSubstate extends FlxSubState
 {
+	/** The substate that is currently open (read by Controls to find the touch pad). */
 	public static var instance:MusicBeatSubstate;
 
 	public function new()
@@ -12,6 +17,8 @@ class MusicBeatSubstate extends FlxSubState
 		controls.isInSubstate = true;
 		super();
 	}
+
+	// ---- song clock ---------------------------------------------------------------------------
 	private var curSection:Int = 0;
 	private var stepsToDo:Int = 0;
 
@@ -23,10 +30,14 @@ class MusicBeatSubstate extends FlxSubState
 
 	private var curDecStep:Float = 0;
 	private var curDecBeat:Float = 0;
-	private var controls(get, never):Controls;
 
+	private var controls(get, never):Controls;
 	inline function get_controls():Controls
 		return Controls.instance;
+
+	// ======================================================================================
+	//  Mobile controls
+	// ======================================================================================
 
 	public var touchPad:TouchPad;
 	public var touchPadCam:FlxCamera;
@@ -47,11 +58,21 @@ class MusicBeatSubstate extends FlxSubState
 			touchPad = FlxDestroyUtil.destroy(touchPad);
 		}
 
-		if(touchPadCam != null)
+		if (touchPadCam != null)
 		{
 			FlxG.cameras.remove(touchPadCam);
 			touchPadCam = FlxDestroyUtil.destroy(touchPadCam);
 		}
+	}
+
+	public function addTouchPadCamera(defaultDrawTarget:Bool = false):Void
+	{
+		if (touchPad == null) return;
+
+		touchPadCam = new FlxCamera();
+		touchPadCam.bgColor.alpha = 0;
+		FlxG.cameras.add(touchPadCam, defaultDrawTarget);
+		touchPad.cameras = [touchPadCam];
 	}
 
 	public function addMobileControls(defaultDrawTarget:Bool = false):Void
@@ -96,120 +117,109 @@ class MusicBeatSubstate extends FlxSubState
 		}
 	}
 
-	public function addTouchPadCamera(defaultDrawTarget:Bool = false):Void
-	{
-		if (touchPad != null)
-		{
-			touchPadCam = new FlxCamera();
-			touchPadCam.bgColor.alpha = 0;
-			FlxG.cameras.add(touchPadCam, defaultDrawTarget);
-			touchPad.cameras = [touchPadCam];
-		}
-	}
+	// ======================================================================================
+	//  Lifecycle
+	// ======================================================================================
 
 	override function destroy()
 	{
 		controls.isInSubstate = false;
 		removeTouchPad();
 		removeMobileControls();
-		
+
 		super.destroy();
 	}
 
 	override function update(elapsed:Float)
 	{
-		//everyStep();
-		if(!persistentUpdate) MusicBeatState.timePassedOnState += elapsed;
-		var oldStep:Int = curStep;
+		// the state underneath is not counting time while this one pauses it
+		if (!persistentUpdate) MusicBeatState.timePassedOnState += elapsed;
+		var previousStep:Int = curStep;
 
 		updateCurStep();
 		updateBeat();
 
-		if (oldStep != curStep)
+		if (previousStep != curStep)
 		{
-			if(curStep > 0)
-				stepHit();
+			if (curStep > 0) stepHit();
 
-			if(PlayState.SONG != null)
+			if (PlayState.SONG != null)
 			{
-				if (oldStep < curStep)
-					updateSection();
-				else
-					rollbackSection();
+				if (previousStep < curStep) updateSection();
+				else rollbackSection();
 			}
 		}
 
 		super.update(elapsed);
 	}
 
+	// ======================================================================================
+	//  Steps, beats, sections
+	// ======================================================================================
+
+	private function updateCurStep():Void
+	{
+		var change = Conductor.getBPMFromSeconds(Conductor.songPosition);
+
+		var stepsIntoChange:Float = ((Conductor.songPosition - ClientPrefs.data.noteOffset) - change.songTime) / change.stepCrochet;
+		curDecStep = change.stepTime + stepsIntoChange;
+		curStep = change.stepTime + Math.floor(stepsIntoChange);
+	}
+
+	private function updateBeat():Void
+	{
+		curBeat = Math.floor(curStep / 4);
+		curDecBeat = curDecStep / 4;
+	}
+
 	private function updateSection():Void
 	{
-		if(stepsToDo < 1) stepsToDo = Math.round(getBeatsOnSection() * 4);
-		while(curStep >= stepsToDo)
+		if (stepsToDo < 1) stepsToDo = Math.round(getBeatsOnSection() * 4);
+
+		while (curStep >= stepsToDo)
 		{
 			curSection++;
-			var beats:Float = getBeatsOnSection();
-			stepsToDo += Math.round(beats * 4);
+			stepsToDo += Math.round(getBeatsOnSection() * 4);
 			sectionHit();
 		}
 	}
 
 	private function rollbackSection():Void
 	{
-		if(curStep < 0) return;
+		if (curStep < 0) return;
 
 		var lastSection:Int = curSection;
 		curSection = 0;
 		stepsToDo = 0;
+
 		for (i in 0...PlayState.SONG.notes.length)
 		{
-			if (PlayState.SONG.notes[i] != null)
-			{
-				stepsToDo += Math.round(getBeatsOnSection() * 4);
-				if(stepsToDo > curStep) break;
-				
-				curSection++;
-			}
+			if (PlayState.SONG.notes[i] == null) continue;
+
+			stepsToDo += Math.round(getBeatsOnSection() * 4);
+			if (stepsToDo > curStep) break;
+
+			curSection++;
 		}
 
-		if(curSection > lastSection) sectionHit();
+		if (curSection > lastSection) sectionHit();
 	}
 
-	private function updateBeat():Void
+	function getBeatsOnSection()
 	{
-		curBeat = Math.floor(curStep / 4);
-		curDecBeat = curDecStep/4;
-	}
-
-	private function updateCurStep():Void
-	{
-		var lastChange = Conductor.getBPMFromSeconds(Conductor.songPosition);
-
-		var shit = ((Conductor.songPosition - ClientPrefs.data.noteOffset) - lastChange.songTime) / lastChange.stepCrochet;
-		curDecStep = lastChange.stepTime + shit;
-		curStep = lastChange.stepTime + Math.floor(shit);
+		var beats:Null<Float> = 4;
+		if (PlayState.SONG != null && PlayState.SONG.notes[curSection] != null)
+			beats = PlayState.SONG.notes[curSection].sectionBeats;
+		return (beats == null) ? 4 : beats;
 	}
 
 	public function stepHit():Void
 	{
-		if (curStep % 4 == 0)
-			beatHit();
+		if (curStep % 4 == 0) beatHit();
 	}
 
-	public function beatHit():Void
-	{
-		//do literally nothing dumbass
-	}
-	
-	public function sectionHit():Void
-	{
-		//yep, you guessed it, nothing again, dumbass
-	}
-	
-	function getBeatsOnSection()
-	{
-		var val:Null<Float> = 4;
-		if(PlayState.SONG != null && PlayState.SONG.notes[curSection] != null) val = PlayState.SONG.notes[curSection].sectionBeats;
-		return val == null ? 4 : val;
-	}
+	// Substates have no beat or section behaviour of their own; override these to add some.
+	public function beatHit():Void {}
+
+	public function sectionHit():Void {}
 }

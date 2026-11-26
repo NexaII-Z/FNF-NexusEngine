@@ -19,18 +19,18 @@ This project is mainly developed by one person. Updates and features may take ti
 
 NEXUS Engine Features
 
-Feature	Progress
-New Stage Editor	100%
-Weekend 1	75%
-New UI for States (excluding editors)	34%
-Pico Mixes	0%
-Erect and Nightmare Mixes	0%
-V-Slice Chart Reader	0%
-Psych Chart to V-Slice Chart Converter	0%
-Game Over Videos in Chart Editor	0%
-New Main Menu UI	100%
-Freeplay Character Selection	0%
-Note Skin Selector	100%
+* Feature	Progress
+* New Stage Editor	90%
+* Weekend 1	75%
+* Pico Mixes	0%
+* Erect and Nightmare Mixes	0%
+* V-Slice Chart Reader	0%
+* Psych Chart to V-Slice Chart Converter	0%
+* Game Over Videos in Chart Editor	0%
+* New Main Menu UI	100%
+* Freeplay Character Selection	0%
+* Note Skin Selector	100%
+* V-slice Mod Support 0%
 
 More features are planned.
 

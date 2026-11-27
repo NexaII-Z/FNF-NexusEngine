@@ -26,7 +26,6 @@ import openfl.display.BitmapData;
 import openfl.display.Shape;
 import flixel.graphics.FlxGraphic;
 import flixel.util.FlxSignal.FlxTypedSignal;
-import openfl.geom.Matrix;
 
 /**
  * A zone with 4 hint's (A hitbox).
@@ -123,6 +122,11 @@ class Hitbox extends MobileInputManager implements IMobileControls
 
 	private function createHint(X:Float, Y:Float, Width:Int, Height:Int, Color:Int = 0xFFFFFF):TouchButton
 	{
+		var base:FlxColor = Color;
+		base = FlxColor.fromRGB(base.red, base.green, base.blue);
+		var darkColor:FlxColor = FlxColor.interpolate(base, FlxColor.BLACK, 0.5);
+		var lightColor:FlxColor = FlxColor.interpolate(base, FlxColor.WHITE, 0.6);
+
 		var hint = new TouchButton(X, Y);
 		hint.statusAlphas = [];
 		hint.statusIndicatorType = NONE;
@@ -130,56 +134,66 @@ class Hitbox extends MobileInputManager implements IMobileControls
 
 		hint.label = new FlxSprite();
 		hint.labelStatusDiff = (ClientPrefs.data.hitboxType != "Hidden") ? ClientPrefs.data.controlsAlpha : 0.00001;
-		hint.label.loadGraphic(createHintGraphic(Width, Math.floor(Height * 0.035), true));
-		if (ClientPrefs.data.hitboxPos)
-			hint.label.offset.y -= (hint.height - hint.label.height) / 2;
-		else
-			hint.label.offset.y += (hint.height - hint.label.height) / 2;
+		hint.label.loadGraphic(createHintGraphic(Width, Height, true));
 
 		if (ClientPrefs.data.hitboxType != "Hidden")
 		{
-			var hintTween:FlxTween = null;
-			var hintLaneTween:FlxTween = null;
+			var fillTween:FlxTween = null;
+			var strokeAlphaTween:FlxTween = null;
+			var strokeColorTween:FlxTween = null;
+			var fillAlpha:Float = ClientPrefs.data.controlsAlpha * 0.5;
+
+			var cancelTweens = function()
+			{
+				if (fillTween != null)
+					fillTween.cancel();
+
+				if (strokeAlphaTween != null)
+					strokeAlphaTween.cancel();
+
+				if (strokeColorTween != null)
+					strokeColorTween.cancel();
+			}
 
 			hint.onDown.callback = function()
 			{
 				onButtonDown.dispatch(hint);
+				cancelTweens();
 
-				if (hintTween != null)
-					hintTween.cancel();
-
-				if (hintLaneTween != null)
-					hintLaneTween.cancel();
-
-				hintTween = FlxTween.tween(hint, {alpha: ClientPrefs.data.controlsAlpha}, ClientPrefs.data.controlsAlpha / 100, {
+				fillTween = FlxTween.tween(hint, {alpha: fillAlpha}, 0.05, {
 					ease: FlxEase.circInOut,
-					onComplete: (twn:FlxTween) -> hintTween = null
+					onComplete: (twn:FlxTween) -> fillTween = null
 				});
 
-				hintLaneTween = FlxTween.tween(hint.label, {alpha: 0.00001}, ClientPrefs.data.controlsAlpha / 10, {
+				strokeAlphaTween = FlxTween.tween(hint.label, {alpha: 1}, 0.05, {
 					ease: FlxEase.circInOut,
-					onComplete: (twn:FlxTween) -> hintTween = null
+					onComplete: (twn:FlxTween) -> strokeAlphaTween = null
+				});
+
+				strokeColorTween = FlxTween.color(hint.label, 0.05, hint.label.color, lightColor, {
+					ease: FlxEase.circInOut,
+					onComplete: (twn:FlxTween) -> strokeColorTween = null
 				});
 			}
 
 			hint.onOut.callback = hint.onUp.callback = function()
 			{
 				onButtonUp.dispatch(hint);
+				cancelTweens();
 
-				if (hintTween != null)
-					hintTween.cancel();
-
-				if (hintLaneTween != null)
-					hintLaneTween.cancel();
-
-				hintTween = FlxTween.tween(hint, {alpha: 0.00001}, ClientPrefs.data.controlsAlpha / 10, {
+				fillTween = FlxTween.tween(hint, {alpha: 0.00001}, 0.18, {
 					ease: FlxEase.circInOut,
-					onComplete: (twn:FlxTween) -> hintTween = null
+					onComplete: (twn:FlxTween) -> fillTween = null
 				});
 
-				hintLaneTween = FlxTween.tween(hint.label, {alpha: ClientPrefs.data.controlsAlpha}, ClientPrefs.data.controlsAlpha / 100, {
+				strokeAlphaTween = FlxTween.tween(hint.label, {alpha: ClientPrefs.data.controlsAlpha}, 0.18, {
 					ease: FlxEase.circInOut,
-					onComplete: (twn:FlxTween) -> hintTween = null
+					onComplete: (twn:FlxTween) -> strokeAlphaTween = null
+				});
+
+				strokeColorTween = FlxTween.color(hint.label, 0.18, hint.label.color, darkColor, {
+					ease: FlxEase.circInOut,
+					onComplete: (twn:FlxTween) -> strokeColorTween = null
 				});
 			}
 		}
@@ -195,54 +209,34 @@ class Hitbox extends MobileInputManager implements IMobileControls
 		hint.label.alpha = (ClientPrefs.data.hitboxType != "Hidden") ? ClientPrefs.data.controlsAlpha : 0.00001;
 		hint.canChangeLabelAlpha = false;
 		hint.label.antialiasing = hint.antialiasing = ClientPrefs.data.antialiasing;
-		hint.color = Color;
+		hint.color = lightColor;
+		hint.label.color = darkColor;
 		#if FLX_DEBUG
 		hint.ignoreDrawDebug = true;
 		#end
 		return hint;
 	}
 
-	function createHintGraphic(Width:Int, Height:Int, ?isLane:Bool = false):FlxGraphic
+	function createHintGraphic(Width:Int, Height:Int, ?isOutline:Bool = false):FlxGraphic
 	{
+		var inset:Float = 6;
 		var shape:Shape = new Shape();
-		shape.graphics.beginFill(0xFFFFFF);
 
-		if (ClientPrefs.data.hitboxType == "No Gradient")
+		if (isOutline)
 		{
-			var matrix:Matrix = new Matrix();
-			matrix.createGradientBox(Width, Height, 0, 0, 0);
-
-			if (isLane)
-				shape.graphics.beginFill(0xFFFFFF);
-			else
-				shape.graphics.beginGradientFill(RADIAL, [0xFFFFFF, 0xFFFFFF], [0, 1], [60, 255], matrix, PAD, RGB, 0);
-			shape.graphics.drawRect(0, 0, Width, Height);
-			shape.graphics.endFill();
+			shape.graphics.lineStyle(4, 0xFFFFFF, 1);
+			shape.graphics.drawRoundRect(inset, inset, Width - inset * 2, Height - inset * 2, 28, 28);
 		}
-		else if (ClientPrefs.data.hitboxType == "No Gradient (Old)")
+		else
 		{
-			shape.graphics.lineStyle(10, 0xFFFFFF, 1);
-			shape.graphics.drawRect(0, 0, Width, Height);
-			shape.graphics.endFill();
-		}
-		else // if (ClientPrefs.data.hitboxType == 'Gradient')
-		{
-			shape.graphics.lineStyle(3, 0xFFFFFF, 1);
-			shape.graphics.drawRect(0, 0, Width, Height);
-			shape.graphics.lineStyle(0, 0, 0);
-			shape.graphics.drawRect(3, 3, Width - 6, Height - 6);
-			shape.graphics.endFill();
-			if (isLane)
-				shape.graphics.beginFill(0xFFFFFF);
-			else
-				shape.graphics.beginGradientFill(RADIAL, [0xFFFFFF, FlxColor.TRANSPARENT], [1, 0], [0, 255], null, null, null, 0.5);
-			shape.graphics.drawRect(3, 3, Width - 6, Height - 6);
+			shape.graphics.beginFill(0xFFFFFF, 1);
+			shape.graphics.drawRoundRect(inset, inset, Width - inset * 2, Height - inset * 2, 28, 28);
 			shape.graphics.endFill();
 		}
 
 		var bitmap:BitmapData = new BitmapData(Width, Height, true, 0);
 		bitmap.draw(shape);
 
-		return FlxG.bitmap.add(bitmap);
+		return FlxG.bitmap.add(bitmap, true);
 	}
 }

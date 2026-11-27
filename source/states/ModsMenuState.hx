@@ -11,6 +11,7 @@ import lime.utils.Assets;
 import haxe.Json;
 
 import flixel.util.FlxSpriteUtil;
+import flixel.util.FlxGradient;
 import objects.AttachedSprite;
 import options.ModSettingsSubState;
 import flixel.addons.transition.FlxTransitionableState;
@@ -48,6 +49,27 @@ class ModsMenuState extends MusicBeatState
 
 	var _lastControllerMode:Bool = false;
 	var startMod:String = null;
+
+	public static var accentColor:FlxColor = 0xFF665AFF;
+	public static final PANEL_COLOR:FlxColor = 0xFF0B0B14;
+	public static final GOOD_COLOR:FlxColor = 0xFF2FBF71;
+	public static final BAD_COLOR:FlxColor = 0xFFE5484D;
+
+	var accentSprites:Array<FlxSprite> = [];
+	var statusPill:FlxSprite;
+	var statusText:FlxText;
+	var modCounter:FlxText;
+	var modFolderText:FlxText;
+
+	function addBorder(x:Float, y:Float, w:Int, h:Int, alpha:Float = 0.55):FlxSprite
+	{
+		var border = FlxSpriteUtil.drawRoundRect(new FlxSprite(x, y).makeGraphic(w, h, FlxColor.TRANSPARENT, true), 1, 1, w - 2, h - 2, 28, 28, FlxColor.TRANSPARENT, {thickness: 2, color: FlxColor.WHITE});
+		border.alpha = alpha;
+		accentSprites.push(border);
+		add(border);
+		return border;
+	}
+
 	public function new(startMod:String = null)
 	{
 		this.startMod = startMod;
@@ -78,8 +100,12 @@ class ModsMenuState extends MusicBeatState
 		add(bg);
 		bg.screenCenter();
 
-		bgList = FlxSpriteUtil.drawRoundRect(new FlxSprite(40, 40).makeGraphic(340, 440, FlxColor.TRANSPARENT), 0, 0, 340, 440, 15, 15, FlxColor.BLACK);
-		bgList.alpha = 0.6;
+		var shade = FlxGradient.createGradientFlxSprite(FlxG.width, FlxG.height, [FlxColor.fromRGB(0, 0, 0, 60), FlxColor.fromRGB(0, 0, 0, 205)], 1, 90);
+		shade.scrollFactor.set();
+		add(shade);
+
+		bgList = FlxSpriteUtil.drawRoundRect(new FlxSprite(40, 40).makeGraphic(340, 440, FlxColor.TRANSPARENT, true), 0, 0, 340, 440, 28, 28, PANEL_COLOR);
+		bgList.alpha = 0.8;
 
 		modsGroup = new FlxTypedGroup<ModItem>();
 
@@ -88,11 +114,7 @@ class ModsMenuState extends MusicBeatState
 			if(startMod == mod) curSelectedMod = i;
 
 			var modItem:ModItem = new ModItem(mod);
-			if(modsList.disabled.contains(mod))
-			{
-				modItem.icon.color = 0xFFFF6666;
-				modItem.text.color = FlxColor.GRAY;
-			}
+			if(modsList.disabled.contains(mod)) modItem.setEnabled(false);
 			modsGroup.add(modItem);
 		}
 
@@ -133,16 +155,15 @@ class ModsMenuState extends MusicBeatState
 				{
 					modsList.disabled.remove(mod.folder);
 					modsList.enabled.push(mod.folder);
-					mod.icon.color = FlxColor.WHITE;
-					mod.text.color = FlxColor.WHITE;
+					mod.setEnabled(true);
 				}
 			}
 			updateModDisplayData();
 			checkToggleButtons();
 			FlxG.sound.play(Paths.sound('scrollMenu'), 0.6);
 		});
-		buttonEnableAll.bg.color = FlxColor.GREEN;
-		buttonEnableAll.focusChangeCallback = function(focus:Bool) if(!focus) buttonEnableAll.bg.color = FlxColor.GREEN;
+		buttonEnableAll.bg.color = GOOD_COLOR;
+		buttonEnableAll.focusChangeCallback = function(focus:Bool) if(!focus) buttonEnableAll.bg.color = GOOD_COLOR;
 		
 		if(!controls.mobileC)
 			add(buttonEnableAll);
@@ -155,16 +176,15 @@ class ModsMenuState extends MusicBeatState
 				{
 					modsList.enabled.remove(mod.folder);
 					modsList.disabled.push(mod.folder);
-					mod.icon.color = 0xFFFF6666;
-					mod.text.color = FlxColor.GRAY;
+					mod.setEnabled(false);
 				}
 			}
 			updateModDisplayData();
 			checkToggleButtons();
 			FlxG.sound.play(Paths.sound('scrollMenu'), 0.6);
 		});
-		buttonDisableAll.bg.color = 0xFFFF6666;
-		buttonDisableAll.focusChangeCallback = function(focus:Bool) if(!focus) buttonDisableAll.bg.color = 0xFFFF6666;
+		buttonDisableAll.bg.color = BAD_COLOR;
+		buttonDisableAll.focusChangeCallback = function(focus:Bool) if(!focus) buttonDisableAll.bg.color = BAD_COLOR;
 		
 		if(!controls.mobileC)
 			add(buttonDisableAll);
@@ -184,6 +204,9 @@ class ModsMenuState extends MusicBeatState
 			add(noModsTxt);
 			noModsTxt.screenCenter(Y);
 
+			add(bgList);
+			addBorder(bgList.x, bgList.y, 340, 440);
+
 			var txt = new FlxText(bgList.x + 15, bgList.y + 15, bgList.width - 30, "No Mods found.", 16);
 			txt.setFormat(Paths.font("vcr.ttf"), 16, FlxColor.WHITE);
 			add(txt);
@@ -199,35 +222,55 @@ class ModsMenuState extends MusicBeatState
 		}
 		//
 
-		bgTitle = FlxSpriteUtil.drawRoundRectComplex(new FlxSprite(bgList.x + bgList.width + 20, 40).makeGraphic(840, 180, FlxColor.TRANSPARENT), 0, 0, 840, 180, 15, 15, 0, 0, FlxColor.BLACK);
-		bgTitle.alpha = 0.6;
+		bgTitle = FlxSpriteUtil.drawRoundRect(new FlxSprite(bgList.x + bgList.width + 20, 40).makeGraphic(840, 180, FlxColor.TRANSPARENT, true), 0, 0, 840, 180, 28, 28, PANEL_COLOR);
+		bgTitle.alpha = 0.8;
 		add(bgTitle);
+		addBorder(bgTitle.x, bgTitle.y, 840, 180);
 
 		icon = new FlxSprite(bgTitle.x + 15, bgTitle.y + 15);
 		add(icon);
 
-		modNameInitialY = icon.y + 80;
+		modNameInitialY = icon.y + 70;
 		modName = new Alphabet(icon.x + 165, modNameInitialY, "", true);
 		modName.scaleY = 0.8;
 		add(modName);
 
-		bgDescription = FlxSpriteUtil.drawRoundRectComplex(new FlxSprite(bgTitle.x, bgTitle.y + 200).makeGraphic(840, 450, FlxColor.TRANSPARENT), 0, 0, 840, 450, 0, 0, 15, 15, FlxColor.BLACK);
-		bgDescription.alpha = 0.6;
+		statusPill = FlxSpriteUtil.drawRoundRect(new FlxSprite(icon.x + 165, bgTitle.y + 137).makeGraphic(120, 28, FlxColor.TRANSPARENT, true), 0, 0, 120, 28, 28, 28, FlxColor.WHITE);
+		statusPill.color = GOOD_COLOR;
+		add(statusPill);
+
+		statusText = new FlxText(statusPill.x, statusPill.y + 5, 120, "ENABLED", 16);
+		statusText.setFormat(Paths.font("vcr.ttf"), 16, FlxColor.BLACK, CENTER);
+		add(statusText);
+
+		modFolderText = new FlxText(statusPill.x + 136, statusPill.y + 5, 440, "", 16);
+		modFolderText.setFormat(Paths.font("vcr.ttf"), 16, FlxColor.WHITE, LEFT);
+		modFolderText.alpha = 0.55;
+		add(modFolderText);
+
+		modCounter = new FlxText(bgTitle.x + bgTitle.width - 175, bgTitle.y + 18, 150, "", 20);
+		modCounter.setFormat(Paths.font("vcr.ttf"), 20, FlxColor.WHITE, RIGHT);
+		modCounter.alpha = 0.6;
+		add(modCounter);
+
+		bgDescription = FlxSpriteUtil.drawRoundRect(new FlxSprite(bgTitle.x, bgTitle.y + 200).makeGraphic(840, 450, FlxColor.TRANSPARENT, true), 0, 0, 840, 450, 28, 28, PANEL_COLOR);
+		bgDescription.alpha = 0.8;
 		add(bgDescription);
-		
-		modDesc = new FlxText(bgDescription.x + 15, bgDescription.y + 15, bgDescription.width - 30, "", 24);
-		modDesc.setFormat(Paths.font("vcr.ttf"), 24, FlxColor.WHITE, LEFT);
+
+		modDesc = new FlxText(bgDescription.x + 20, bgDescription.y + 20, bgDescription.width - 40, "", 24);
+		modDesc.setFormat(Paths.font("vcr.ttf"), 24, 0xFFE9E9F2, LEFT);
 		add(modDesc);
 
 		var myHeight = 100;
-		modRestartText = new FlxText(bgDescription.x + 15, bgDescription.y + bgDescription.height - myHeight - 25, bgDescription.width - 30, "* Moving or Toggling On/Off this Mod will restart the game.", 16);
-		modRestartText.setFormat(Paths.font("vcr.ttf"), 16, FlxColor.WHITE, RIGHT);
+		modRestartText = new FlxText(bgDescription.x + 20, bgDescription.y + bgDescription.height - myHeight - 25, bgDescription.width - 40, "* Moving or Toggling On/Off this Mod will restart the game.", 16);
+		modRestartText.setFormat(Paths.font("vcr.ttf"), 16, 0xFFFFB84D, RIGHT);
 		add(modRestartText);
 
-		bgButtons = FlxSpriteUtil.drawRoundRectComplex(new FlxSprite(bgDescription.x, bgDescription.y + bgDescription.height - myHeight).makeGraphic(840, myHeight, FlxColor.TRANSPARENT), 0, 0, 840, myHeight, 0, 0, 15, 15, FlxColor.WHITE);
+		bgButtons = FlxSpriteUtil.drawRoundRectComplex(new FlxSprite(bgDescription.x, bgDescription.y + bgDescription.height - myHeight).makeGraphic(840, myHeight, FlxColor.TRANSPARENT, true), 0, 0, 840, myHeight, 0, 0, 14, 14, FlxColor.WHITE);
 		bgButtons.color = FlxColor.BLACK;
 		bgButtons.alpha = 0.2;
 		add(bgButtons);
+		addBorder(bgDescription.x, bgDescription.y, 840, 450);
 
 		var buttonsX = bgButtons.x + 320;
 		var buttonsY = bgButtons.y + 10;
@@ -287,8 +330,7 @@ class ModsMenuState extends MusicBeatState
 				modsList.disabled.remove(mod);
 				modsList.enabled.push(mod);
 			}
-			curMod.icon.color = modsList.disabled.contains(mod) ? 0xFFFF6666 : FlxColor.WHITE;
-			curMod.text.color = modsList.disabled.contains(mod) ? FlxColor.GRAY : FlxColor.WHITE;
+			curMod.setEnabled(!modsList.disabled.contains(mod));
 
 			if(curMod.mustRestart) waitingToRestart = true;
 			updateModDisplayData();
@@ -301,7 +343,7 @@ class ModsMenuState extends MusicBeatState
 		buttons.push(button);
 		button.focusChangeCallback = function(focus:Bool) {
 			if(!focus)
-				button.bg.color = modsList.enabled.contains(modsGroup.members[curSelectedMod].folder) ? FlxColor.GREEN : 0xFFFF6666;
+				button.bg.color = modsList.enabled.contains(modsGroup.members[curSelectedMod].folder) ? GOOD_COLOR : BAD_COLOR;
 		};
 
 		if(modsList.all.length < 1)
@@ -311,17 +353,25 @@ class ModsMenuState extends MusicBeatState
 		}
 		
 		add(bgList);
+		addBorder(bgList.x, bgList.y, 340, 440);
 		add(modsGroup);
 		_lastControllerMode = controls.controllerMode;
 
 		changeSelectedMod();
 
-		var bottomBG = new FlxSprite(0, FlxG.height - 26).makeGraphic(FlxG.width, 26, 0xFF000000);
-		bottomBG.alpha = 0.6;
+		var bottomBG = new FlxSprite(0, FlxG.height - 26).makeGraphic(FlxG.width, 26, PANEL_COLOR);
+		bottomBG.alpha = 0.9;
 		add(bottomBG);
 
-		var bottomText = new FlxText(bottomBG.x, bottomBG.y + 4, FlxG.width, "Press " + daButton + " To Leave", 16);
+		var bottomLine = new FlxSprite(0, FlxG.height - 28).makeGraphic(FlxG.width, 2, FlxColor.WHITE, true);
+		bottomLine.alpha = 0.55;
+		accentSprites.push(bottomLine);
+		add(bottomLine);
+
+		var hintStr:String = controls.mobileC ? "Press " + daButton + " To Leave" : "UP / DOWN: Select     SHIFT: Fast Scroll     DRAG: Reorder     " + daButton + ": Leave";
+		var bottomText = new FlxText(bottomBG.x, bottomBG.y + 4, FlxG.width, hintStr, 16);
 		bottomText.setFormat(Paths.font("vcr.ttf"), 16, FlxColor.WHITE, CENTER);
+		bottomText.alpha = 0.8;
 		bottomText.scrollFactor.set();
 		add(bottomText);
 
@@ -346,6 +396,10 @@ class ModsMenuState extends MusicBeatState
 	var exiting:Bool = false;
 	override function update(elapsed:Float)
 	{
+		var acc:FlxColor = FlxColor.interpolate(bg.color, FlxColor.WHITE, 0.35);
+		accentColor = acc;
+		for (spr in accentSprites) spr.color = acc;
+
 		if(controls.BACK && hoveringOnMods && !exiting)
 		{
 			exiting = true;
@@ -743,6 +797,12 @@ class ModsMenuState extends MusicBeatState
 		modRestartText.visible = curMod.mustRestart;
 		modDesc.text = curMod.desc;
 
+		var isOn:Bool = !modsList.disabled.contains(curMod.folder);
+		statusPill.color = isOn ? GOOD_COLOR : BAD_COLOR;
+		statusText.text = isOn ? "ENABLED" : "DISABLED";
+		modFolderText.text = 'mods/' + curMod.folder;
+		modCounter.text = StringTools.lpad(Std.string(curSelectedMod + 1), "0", 2) + " / " + StringTools.lpad(Std.string(modsList.all.length), "0", 2);
+
 		for (button in buttons) if(button.focusChangeCallback != null) button.focusChangeCallback(button.onFocus);
 		settingsButton.enabled = (curMod.settings != null && curMod.settings.length > 0);
 	}
@@ -841,7 +901,9 @@ class ModsMenuState extends MusicBeatState
 
 class ModItem extends FlxSpriteGroup
 {
+	public var rowBg:FlxSprite;
 	public var selectBg:FlxSprite;
+	public var dot:FlxSprite;
 	public var icon:FlxSprite;
 	public var text:FlxText;
 	public var totalFrames:Int = 0;
@@ -880,19 +942,28 @@ class ModItem extends FlxSpriteGroup
 			}
 		}
 
-		selectBg = new FlxSprite().makeGraphic(1, 1, FlxColor.WHITE);
-		selectBg.alpha = 0.8;
+		rowBg = FlxSpriteUtil.drawRoundRect(new FlxSprite().makeGraphic(330, 78, FlxColor.TRANSPARENT, true), 0, 0, 330, 78, 24, 24, FlxColor.WHITE);
+		rowBg.color = FlxColor.BLACK;
+		rowBg.alpha = 0.35;
+		add(rowBg);
+
+		selectBg = new FlxSprite().loadGraphicFromSprite(rowBg);
+		selectBg.alpha = 0.9;
 		selectBg.visible = false;
 		add(selectBg);
 
-		icon = new FlxSprite(5, 5);
+		dot = FlxSpriteUtil.drawCircle(new FlxSprite(304, 32).makeGraphic(14, 14, FlxColor.TRANSPARENT, true), -1, -1, 6, FlxColor.WHITE);
+		dot.color = ModsMenuState.GOOD_COLOR;
+		add(dot);
+
+		icon = new FlxSprite(4, 2);
 		icon.antialiasing = ClientPrefs.data.antialiasing;
 		add(icon);
 
-		text = new FlxText(95, 38, 230, "", 16);
+		text = new FlxText(90, 0, 205, "", 16);
 		text.setFormat(Paths.font("vcr.ttf"), 16, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		text.borderSize = 2;
-		text.y -= Std.int(text.height / 2);
+		
 		add(text);
 
 		var isPixel = false;
@@ -927,6 +998,8 @@ class ModItem extends FlxSpriteGroup
 			this.mustRestart = (pack.restart == true);
 		}
 		text.text = this.name;
+		text.y = Std.int((78 - text.height) / 2);
+		selectBg.color = FlxColor.interpolate(bgColor, FlxColor.WHITE, 0.2);
 
 		if(bmp != null)
 		{
@@ -934,14 +1007,20 @@ class ModItem extends FlxSpriteGroup
 			icon.animation.add("icon", [for (i in 0...totalFrames) i], iconFps);
 			icon.animation.play("icon");
 		}
-		selectBg.scale.set(width + 5, height + 5);
-		selectBg.updateHitbox();
+		}
+
+	public function setEnabled(on:Bool)
+	{
+		icon.color = on ? FlxColor.WHITE : 0xFFFF6666;
+		text.color = on ? FlxColor.WHITE : FlxColor.GRAY;
+		dot.color = on ? ModsMenuState.GOOD_COLOR : ModsMenuState.BAD_COLOR;
 	}
 }
 
 class MenuButton extends FlxSpriteGroup
 {
 	public var bg:FlxSprite;
+	public var border:FlxSprite;
 	public var textOn:Alphabet;
 	public var textOff:Alphabet;
 	public var icon:FlxSprite;
@@ -951,9 +1030,12 @@ class MenuButton extends FlxSpriteGroup
 	{
 		super(x, y);
 		
-		bg = FlxSpriteUtil.drawRoundRect(new FlxSprite().makeGraphic(width, height, FlxColor.TRANSPARENT), 0, 0, width, height, 15, 15, FlxColor.WHITE);
-		bg.color = FlxColor.BLACK;
+		bg = FlxSpriteUtil.drawRoundRect(new FlxSprite().makeGraphic(width, height, FlxColor.TRANSPARENT), 0, 0, width, height, 24, 24, FlxColor.WHITE);
+		bg.color = ModsMenuState.PANEL_COLOR;
 		add(bg);
+
+		border = FlxSpriteUtil.drawRoundRect(new FlxSprite().makeGraphic(width, height, FlxColor.TRANSPARENT, true), 1, 1, width - 2, height - 2, 24, 24, FlxColor.TRANSPARENT, {thickness: 2, color: FlxColor.WHITE});
+		add(border);
 
 		if(text != null)
 		{
@@ -1050,8 +1132,10 @@ class MenuButton extends FlxSpriteGroup
 	public function setButtonVisibility(focusVal:Bool)
 	{
 		alpha = 1;
-		bg.color = focusVal ? FlxColor.WHITE : FlxColor.BLACK;
-		bg.alpha = focusVal ? 0.8 : 0.6;
+		bg.color = focusVal ? FlxColor.WHITE : ModsMenuState.PANEL_COLOR;
+		bg.alpha = focusVal ? 0.92 : 0.8;
+		border.color = focusVal ? ModsMenuState.accentColor : FlxColor.WHITE;
+		border.alpha = focusVal ? 1 : 0.25;
 
 		var focusAlpha = focusVal ? 1 : 0.6;
 		if(textOn != null && textOff != null)
